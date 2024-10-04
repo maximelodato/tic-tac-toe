@@ -1,39 +1,39 @@
 class Morpion {
-	humanPlayer = 'J1';
-	iaPlayer = 'J2';
-	gameOver = false;
-	gridMap = [
-		[null, null, null],
-		[null, null, null],
-		[null, null, null],
-	];
+    humanPlayer = 'J1';
+    iaPlayer = 'J2';
+    gameOver = false;
+    gridMap = [
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+    ];
 
-	constructor(firstPlayer = 'J1') {
-		this.humanPlayer = firstPlayer;
-		this.iaPlayer = (firstPlayer === 'J1') ? 'J2' : 'J1';
-		this.initGame();
-	}
+	constructor() {
+        // Choisir aléatoirement qui commence (J1 ou J2)
+        const randomStart = Math.random() < 0.5;
+        this.currentPlayer = randomStart ? this.humanPlayer : this.iaPlayer;
+        this.initGame();
+    }
 
-	initGame = () => {
-		this.gridMap.forEach((line, y) => {
-			line.forEach((cell, x) => {
-				this.getCell(x, y).onclick = () => {
-					this.doPlayHuman(x, y);
-				};
-			});
-		});
+    initGame = () => {
+        this.gridMap.forEach((line, y) => {
+            line.forEach((cell, x) => {
+                this.getCell(x, y).onclick = () => {
+                    this.doPlayHuman(x, y);
+                };
+            });
+        });
 
-		if (this.iaPlayer === 'J1') {
-			this.doPlayIa();
-		}
-	}
-
-	getCell = (x, y) => {
-		const column = x + 1;
-		const lines = ['A', 'B', 'C'];
-		const cellId = `${lines[y]}${column}`;
-		return document.getElementById(cellId);
-	}
+		if (this.currentPlayer === this.iaPlayer) {
+            this.doPlayIa();
+        }
+    }
+    getCell = (x, y) => {
+        const column = x + 1;
+        const lines = ['A', 'B', 'C'];
+        const cellId = `${lines[y]}${column}`;
+        return document.getElementById(cellId);
+    }
 
     getBoardWinner = (board) => {
         const isWinningRow = ([a, b, c]) => (
@@ -68,21 +68,21 @@ class Morpion {
         }
 
         const isFull = board.every((line) => (
-			line.every((cell) => cell !== null)
-		));
+            line.every((cell) => cell !== null)
+        ));
         return isFull ? 'tie' : null;
     }
 
-	checkWinner = (lastPlayer) => {
+    checkWinner = (lastPlayer) => {
         const winner = this.getBoardWinner(this.gridMap);
         if (!winner) {
             return;
         }
 
         this.gameOver = true;
-        switch(winner) {
+        switch (winner) {
             case 'tie':
-			    this.displayEndMessage("Vous êtes à égalité !");
+                this.displayEndMessage("Vous êtes à égalité !");
                 break;
             case this.iaPlayer:
                 this.displayEndMessage("L'IA a gagné !");
@@ -91,47 +91,115 @@ class Morpion {
                 this.displayEndMessage("Tu as battu l'IA !");
                 break;
         }
-	}
+    }
 
-	displayEndMessage = (message) => {
-		const endMessageElement = document.getElementById('end-message');
-		endMessageElement.textContent = message;
-		endMessageElement.style.display = 'block';
-	}
+    displayEndMessage = (message) => {
+        const endMessageElement = document.getElementById('end-message');
+        endMessageElement.textContent = message;
+        endMessageElement.style.display = 'block';
+    }
 
-	drawHit = (x, y, player) => {
-		if (this.gridMap[y][x] !== null) {
-			return false;
-		}
+    drawHit = (x, y, player) => {
+        if (this.gridMap[y][x] !== null) {
+            return false;
+        }
 
-		this.gridMap[y][x] = player;
-		this.getCell(x, y).classList.add(`filled-${player}`);
-		this.checkWinner(player);
-		return true;
-	}
+        this.gridMap[y][x] = player;
+        this.getCell(x, y).classList.add(`filled-${player}`);
+        this.checkWinner(player);
+        return true;
+    }
 
-	doPlayHuman = (x, y) => {
-		if (this.gameOver) {
-			return;
-		}
+    doPlayHuman = (x, y) => {
+        if (this.gameOver) {
+            return;
+        }
 
-		if (this.drawHit(x, y, this.humanPlayer)) {
-			this.doPlayIa();
-		}
-	}
+        if (this.drawHit(x, y, this.humanPlayer)) {
+            this.doPlayIa();
+        }
+    }
 
-	doPlayIa = () => {
-		if (this.gameOver) {
-			return;
-		}
+    doPlayIa = () => {
+        if (this.gameOver) {
+            return;
+        }
 
-		let hasPlayed = false;
-		this.gridMap.forEach((line, y) => {
-			line.forEach((cell, x) => {
-				if (!cell && !hasPlayed) {
-					hasPlayed = this.drawHit(x, y, this.iaPlayer);
-				}
-			});
-		});
-	}
+        let bestMove = this.minimax(this.gridMap, 0, -Infinity, Infinity, true).move;
+        this.drawHit(bestMove.x, bestMove.y, this.iaPlayer);
+    }
+
+    // Algorithme Minimax avec élagage alpha-bêta
+    minimax = (board, depth, alpha, beta, isMaximizingPlayer) => {
+        const winner = this.getBoardWinner(board);
+        if (winner === this.iaPlayer) return { score: 10 - depth };
+        if (winner === this.humanPlayer) return { score: depth - 10 };
+        if (winner === 'tie') return { score: 0 };
+
+        let bestMove = null;
+        const availableMoves = this.getAvailableMoves(board);
+
+        // Prioriser le centre et les coins pour une stratégie optimale
+        const preferedMoves = [{x: 1, y: 1}, {x: 0, y: 0}, {x: 0, y: 2}, {x: 2, y: 0}, {x: 2, y: 2}];
+
+        availableMoves.sort((a, b) => {
+            let aIndex = preferedMoves.findIndex(move => move.x === a.x && move.y === a.y);
+            let bIndex = preferedMoves.findIndex(move => move.x === b.x && move.y === b.y);
+            return (aIndex === -1 ? 100 : aIndex) - (bIndex === -1 ? 100 : bIndex);
+        });
+
+        if (isMaximizingPlayer) {
+            let maxEval = -Infinity;
+            availableMoves.forEach(move => {
+                let newBoard = this.cloneBoard(board);
+                newBoard[move.y][move.x] = this.iaPlayer;
+
+                let result = this.minimax(newBoard, depth + 1, alpha, beta, false);
+                if (result.score > maxEval) {
+                    maxEval = result.score;
+                    bestMove = move;
+                }
+                alpha = Math.max(alpha, maxEval);
+                if (beta <= alpha) {
+                    return { score: maxEval, move: bestMove };  // Alpha cutoff
+                }
+            });
+            return { score: maxEval, move: bestMove };
+        } else {
+            let minEval = Infinity;
+            availableMoves.forEach(move => {
+                let newBoard = this.cloneBoard(board);
+                newBoard[move.y][move.x] = this.humanPlayer;
+
+                let result = this.minimax(newBoard, depth + 1, alpha, beta, true);
+                if (result.score < minEval) {
+                    minEval = result.score;
+                    bestMove = move;
+                }
+                beta = Math.min(beta, minEval);
+                if (beta <= alpha) {
+                    return { score: minEval, move: bestMove };  // Beta cutoff
+                }
+            });
+            return { score: minEval, move: bestMove };
+        }
+    }
+
+    // Obtenir les coups disponibles
+    getAvailableMoves = (board) => {
+        let moves = [];
+        board.forEach((line, y) => {
+            line.forEach((cell, x) => {
+                if (cell === null) {
+                    moves.push({ x, y });
+                }
+            });
+        });
+        return moves;
+    }
+
+    // Cloner le tableau pour ne pas modifier l'original
+    cloneBoard = (board) => {
+        return board.map(row => row.slice());
+    }
 }
